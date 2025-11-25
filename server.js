@@ -80,68 +80,73 @@ const mongooseOptions = {
   serverSelectionTimeoutMS: 10000,
 };
 
-async function startServer() {
+async function connectDB() {
   try {
     console.log('Intentando conectar a MongoDB...');
     await mongoose.connect(MONGO_URI, mongooseOptions);
     console.log('Conectado a MongoDB');
-
-    app.use('/API/Usuario', authRoutes);
-    app.use('/API/Propiedad', propertyRoutes);
-    app.use('/API/Reserva', reservationRoutes);
-    app.use('/API/Contacto', contactRoutes);
-    app.use('/API/Tasacion', tasacionRoutes);
-    app.use('/API/Config', configRoutes);
-
-    app.get('/health', (req, res) => {
-      res.json({
-        status: true,
-        message: 'API funcionando correctamente',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      });
-    });
-
-    app.get('/', (req, res) => {
-      res.json({
-        status: true,
-        message: 'Bienvenido a la API de Mkalpin Negocios Inmobiliarios',
-        version: '1.0.0',
-        documentation: '/api-docs'
-      });
-    });
-
-    app.use(notFound);
-    app.use(errorHandler);
-
-    process.on('unhandledRejection', (err) => {
-      console.error('❌ Error no manejado:', err);
-      server.close(() => {
-        process.exit(1);
-      });
-    });
-
-    process.on('uncaughtException', (err) => {
-      console.error('❌ Excepción no capturada:', err);
-      process.exit(1);
-    });
-
-    const PORT = process.env.PORT || 5228;
-    console.log(`Configuring server on port: ${PORT}`);
-    console.log(`MONGODB_URI defined: ${!!process.env.MONGODB_URI}`);
-
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Servidor API iniciado en http://0.0.0.0:${PORT}`);
-    });
   } catch (err) {
     console.error('Error conectando a MongoDB:', err);
     setTimeout(() => {
       console.log('Reintentando conexión a MongoDB...');
-      startServer();
+      connectDB();
     }, 5000);
   }
 }
 
-startServer();
+// Configurar rutas
+app.use('/API/Usuario', authRoutes);
+app.use('/API/Propiedad', propertyRoutes);
+app.use('/API/Reserva', reservationRoutes);
+app.use('/API/Contacto', contactRoutes);
+app.use('/API/Tasacion', tasacionRoutes);
+app.use('/API/Config', configRoutes);
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: true,
+    message: 'API funcionando correctamente',
+    dbStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+app.get('/', (req, res) => {
+  res.json({
+    status: true,
+    message: 'Bienvenido a la API de Mkalpin Negocios Inmobiliarios',
+    version: '1.0.0',
+    documentation: '/api-docs'
+  });
+});
+
+app.use(notFound);
+app.use(errorHandler);
+
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Error no manejado:', err);
+  // No cerrar el servidor en producción para evitar reinicios constantes si es un error no crítico
+  if (process.env.NODE_ENV === 'development') {
+    process.exit(1);
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Excepción no capturada:', err);
+  if (process.env.NODE_ENV === 'development') {
+    process.exit(1);
+  }
+});
+
+const PORT = process.env.PORT || 5228;
+console.log(`Configuring server on port: ${PORT}`);
+console.log(`MONGODB_URI defined: ${!!process.env.MONGODB_URI}`);
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor API iniciado en http://0.0.0.0:${PORT}`);
+  // Iniciar conexión a DB después de levantar el servidor
+  connectDB();
+});
 
 module.exports = app;
