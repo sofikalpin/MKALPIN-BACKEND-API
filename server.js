@@ -127,8 +127,11 @@ async function startServer() {
     });
 
     const PORT = process.env.PORT || 5228;
-    const server = app.listen(PORT, () => {
-      console.log(`Servidor API iniciado en http://localhost:${PORT}`);
+    console.log(`Configuring server on port: ${PORT}`);
+    console.log(`MONGODB_URI defined: ${!!process.env.MONGODB_URI}`);
+
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Servidor API iniciado en http://0.0.0.0:${PORT}`);
     });
   } catch (err) {
     console.error('Error conectando a MongoDB:', err);
