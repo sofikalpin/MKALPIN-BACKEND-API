@@ -44,6 +44,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
+      'https://mkalpin-frontend-web.onrender.com',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
