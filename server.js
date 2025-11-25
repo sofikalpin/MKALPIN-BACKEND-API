@@ -94,7 +94,20 @@ async function connectDB() {
   }
 }
 
+// Middleware para verificar conexión a DB
+const checkDbConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      status: false,
+      message: 'La base de datos no está disponible. Por favor intente más tarde.',
+      dbStatus: mongoose.connection.readyState
+    });
+  }
+  next();
+};
+
 // Configurar rutas
+app.use('/API', checkDbConnection); // Aplicar verificación a todas las rutas API
 app.use('/API/Usuario', authRoutes);
 app.use('/API/Propiedad', propertyRoutes);
 app.use('/API/Reserva', reservationRoutes);
