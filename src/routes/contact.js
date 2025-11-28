@@ -4,23 +4,17 @@ const { protect } = require('../middleware/auth');
 const { validateContact, validateId } = require('../middleware/validation');
 const { body, query } = require('express-validator');
 const { handleValidationErrors } = require('../middleware/validation');
-const nodemailer = require('nodemailer');
-const { body: bodyValidator } = require('express-validator');
+
+const sgMail = require('@sendgrid/mail');
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else {
+  console.warn('SENDGRID_API_KEY no está configurado. Las notificaciones de contacto no se enviarán.');
+}
 
 const router = express.Router();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+
 
 router.post('/Enviar', validateContact, async (req, res) => {
   console.log('Datos recibidos:', req.body);
@@ -33,26 +27,28 @@ router.post('/Enviar', validateContact, async (req, res) => {
     const contact = new Contact(contactData);
     await contact.save();
 
-    const mailOptions = {
-      from: `"MKAlpini Inmobiliaria - Formulario de Contacto" <${process.env.EMAIL_FROM}>`,
-      to: process.env.TASACION_EMAIL_TO,
-      subject: `Nuevo mensaje de contacto desde la web de ${contactData.nombre || 'No proporcionado'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>📌 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
-            <p><strong>✉️ Email:</strong> ${contactData.email || 'No proporcionado'}</p>
-            <p><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
-            <div style="margin-top: 15px; padding: 10px; background-color: #fff; border-left: 4px solid #4f46e5;">
-              <p style="margin: 0;"><strong>Mensaje:</strong></p>
-              <p style="white-space: pre-line; margin: 10px 0 0 0;">${contactData.mensaje || 'Sin mensaje'}</p>
-            </div>
+    const detallesHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>📌 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
+          <p><strong>✉️ Email:</strong> ${contactData.email || 'No proporcionado'}</p>
+          <p><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
+          <div style="margin-top: 15px; padding: 10px; background-color: #fff; border-left: 4px solid #4f46e5;">
+            <p style="margin: 0;"><strong>Mensaje:</strong></p>
+            <p style="white-space: pre-line; margin: 10px 0 0 0;">${contactData.mensaje || 'Sin mensaje'}</p>
           </div>
         </div>
-      `
+      </div>
+    `;
+
+    const msg = {
+      to: process.env.TASACION_EMAIL_TO,
+      from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
+      subject: `Nuevo mensaje de contacto desde la web de ${contactData.nombre || 'No proporcionado'}`,
+      html: detallesHtml,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.status(201).json({
       status: true,
@@ -274,36 +270,36 @@ router.post('/EnviarConsultaPropiedad', validateContact, async (req, res) => {
 
     await contact.save();
 
-    const mailOptions = {
-      from: `"MKAlpini Inmobiliaria - Consulta por Propiedad" <${process.env.EMAIL_FROM}>`,
-      to: process.env.TASACION_EMAIL_TO,
-      subject: `📌 Consulta por la propiedad: ${tituloPropiedad || 'Propiedad sin título'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #4f46e5; margin-top: 0;">Consulta por Propiedad</h2>
-            <h3 style="margin-top: 0; color: #1f2937;">${tituloPropiedad || 'Propiedad sin título'}</h3>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #4f46e5;">
-              <p style="margin: 5px 0;"><strong>🔹 Propiedad:</strong> ${tituloPropiedad || 'No especificada'}</p>
-              <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
-              <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${contactData.email || 'No proporcionado'}</p>
-              <p style="margin: 5px 0;"><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
-              <div style="margin-top: 15px; padding: 10px; background-color: #f3f4f6; border-radius: 4px;">
-                <p style="margin: 0 0 5px 0; font-weight: 500;">Mensaje:</p>
-                <p style="margin: 0; white-space: pre-line;">${contactData.mensaje || 'El contacto no dejó un mensaje.'}</p>
-              </div>
+    const detallesHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Consulta por Propiedad</h2>
+          <h3 style="margin-top: 0; color: #1f2937;">${tituloPropiedad || 'Propiedad sin título'}</h3>
+          <div style="background-color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #4f46e5;">
+            <p style="margin: 5px 0;"><strong>🔹 Propiedad:</strong> ${tituloPropiedad || 'No especificada'}</p>
+            <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
+            <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${contactData.email || 'No proporcionado'}</p>
+            <p style="margin: 5px 0;"><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
+            <div style="margin-top: 15px; padding: 10px; background-color: #f3f4f6; border-radius: 4px;">
+              <p style="margin: 0 0 5px 0; font-weight: 500;">Mensaje:</p>
+              <p style="margin: 0; white-space: pre-line;">${contactData.mensaje || 'El contacto no dejó un mensaje.'}</p>
             </div>
-            
-            <p style="font-size: 14px; color: #6b7280; margin: 20px 0 0 0; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-              Este mensaje fue enviado desde el formulario de contacto de la propiedad en MKAlpini Inmobiliaria.
-            </p>
           </div>
+          <p style="font-size: 14px; color: #6b7280; margin: 20px 0 0 0; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+            Este mensaje fue enviado desde el formulario de contacto de la propiedad en MKAlpini Inmobiliaria.
+          </p>
         </div>
-      `
+      </div>
+    `;
+
+    const msg = {
+      to: process.env.TASACION_EMAIL_TO,
+      from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
+      subject: `📌 Consulta por la propiedad: ${tituloPropiedad || 'Propiedad sin título'}`,
+      html: detallesHtml,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.status(201).json({
       status: true,
@@ -388,35 +384,36 @@ router.post('/AlquilerTemporal', [
       });
     };
 
-    const mailOptions = {
-      from: `"MKAlpini Inmobiliaria - Consulta de Alquiler Temporal" <${process.env.EMAIL_FROM}>`,
-      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `Consulta de alquiler temporal de ${contactData.nombre || 'Cliente'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #4f46e5;">Consulta de Alquiler Temporal</h2>
-          <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #374151; margin-top: 0;">Datos del Cliente</h3>
-            <p><strong>👤 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
-            <p><strong>✉️ Email:</strong> ${contactData.email || 'No proporcionado'}</p>
-            <p><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
-            
-            <h3 style="color: #374151; margin-top: 20px;">Detalles del Alquiler</h3>
-            <p><strong>🏠 Fecha de Entrada:</strong> ${formatoFecha(fechaEntrada)}</p>
-            <p><strong>🚪 Fecha de Salida:</strong> ${formatoFecha(fechaSalida)}</p>
-            <p><strong>👥 Cantidad de Personas:</strong> ${cantidadPersonas}</p>
-            
-            ${contactData.mensaje ? `
-            <div style="margin-top: 15px; padding: 10px; background-color: #fff; border-left: 4px solid #4f46e5;">
-              <p style="margin: 0;"><strong>Mensaje adicional:</strong></p>
-              <p style="white-space: pre-line; margin: 10px 0 0 0;">${contactData.mensaje}</p>
-            </div>` : ''}
-          </div>
+
+    const detallesHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #4f46e5;">Consulta de Alquiler Temporal</h2>
+        <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #374151; margin-top: 0;">Datos del Cliente</h3>
+          <p><strong>👤 Nombre:</strong> ${contactData.nombre || 'No proporcionado'}</p>
+          <p><strong>✉️ Email:</strong> ${contactData.email || 'No proporcionado'}</p>
+          <p><strong>📱 Teléfono:</strong> ${contactData.telefono || 'No proporcionado'}</p>
+          <h3 style="color: #374151; margin-top: 20px;">Detalles del Alquiler</h3>
+          <p><strong>🏠 Fecha de Entrada:</strong> ${formatoFecha(fechaEntrada)}</p>
+          <p><strong>🚪 Fecha de Salida:</strong> ${formatoFecha(fechaSalida)}</p>
+          <p><strong>👥 Cantidad de Personas:</strong> ${cantidadPersonas}</p>
+          ${contactData.mensaje ? `
+          <div style="margin-top: 15px; padding: 10px; background-color: #fff; border-left: 4px solid #4f46e5;">
+            <p style="margin: 0;"><strong>Mensaje adicional:</strong></p>
+            <p style="white-space: pre-line; margin: 10px 0 0 0;">${contactData.mensaje}</p>
+          </div>` : ''}
         </div>
-      `
+      </div>
+    `;
+
+    const msg = {
+      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+      from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
+      subject: `Consulta de alquiler temporal de ${contactData.nombre || 'Cliente'}`,
+      html: detallesHtml,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.status(201).json({
       status: true,

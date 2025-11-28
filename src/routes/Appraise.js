@@ -5,7 +5,7 @@ const { protect, optionalAuth } = require('../middleware/auth');
 const { validateTasacion, validateId, handleValidationErrors } = require('../middleware/validation');
 const { uploadTasacionImages, handleMulterError, getFileUrl } = require('../middleware/upload');
 const { body, query } = require('express-validator');
-const nodemailer = require('nodemailer');
+
 
 const normalizePropertyType = (type = '') => {
   const map = {
@@ -22,32 +22,18 @@ const normalizePropertyType = (type = '') => {
   return map[type.toLowerCase()] || 'Casa';
 };
 
-let emailTransporter = null;
 
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  try {
-    emailTransporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT, 10) || 587,
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-  } catch (transportError) {
-    console.error('No se pudo configurar el transporte de correo:', transportError);
-    emailTransporter = null;
-  }
+const sgMail = require('@sendgrid/mail');
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 } else {
-  console.warn('Credenciales de correo no configuradas. Las notificaciones de tasaciones no se enviarán.');
+  console.warn('SENDGRID_API_KEY no está configurado. Las notificaciones de tasaciones no se enviarán.');
 }
 
 const sendTasacionNotification = async (tasacion, payload, files = []) => {
-  if (!emailTransporter) {
+  if (!process.env.SENDGRID_API_KEY) {
     return;
   }
-
   try {
     const contactoEmail = payload.correoContacto;
     const detallesHtml = `
@@ -74,20 +60,31 @@ const sendTasacionNotification = async (tasacion, payload, files = []) => {
       ${files.length ? '<p><strong>Imágenes adjuntas:</strong> Sí</p>' : '<p><strong>Imágenes adjuntas:</strong> No</p>'}
     `;
 
-    await emailTransporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    const msg = {
       to: process.env.TASACION_EMAIL_TO || 'mkalpinni@gmail.com',
+      from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
       replyTo: contactoEmail,
       subject: `Nueva solicitud de tasación - ${tasacion.tituloPropiedad}`,
       html: detallesHtml,
-      attachments: files.map((file) => ({
-        filename: file.originalname,
-        path: file.path,
-        contentType: file.mimetype
-      }))
-    });
+    };
+
+    // SendGrid attachments (base64)
+    if (files && files.length > 0) {
+      msg.attachments = await Promise.all(files.map(async (file) => {
+        const fs = require('fs').promises;
+        const fileData = await fs.readFile(file.path);
+        return {
+          content: fileData.toString('base64'),
+          filename: file.originalname,
+          type: file.mimetype,
+          disposition: 'attachment',
+        };
+      }));
+    }
+
+    await sgMail.send(msg);
   } catch (emailError) {
-    console.error('Error enviando email de tasación:', emailError);
+    console.error('Error enviando email de tasación (SendGrid):', emailError);
   }
 };
 
