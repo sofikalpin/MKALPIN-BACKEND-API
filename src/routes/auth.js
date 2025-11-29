@@ -18,36 +18,36 @@ if (process.env.SENDGRID_API_KEY) {
 const seedPath = path.join(__dirname, '..', '..', 'scripts', 'seedDatabase.js');
 
 async function syncSeedWithUserProfile(correo, updates) {
-    try {
-      // Opciones de correo para SendGrid
-      const msg = {
-        to: correo,
-        from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
-        subject: 'Actualización de perfil',
-        html: `<p>Hola,<br>Tu perfil ha sido actualizado correctamente.</p>`
-      };
+  try {
+    // Opciones de correo para SendGrid
+    const msg = {
+      to: correo,
+      from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
+      subject: 'Actualización de perfil',
+      html: `<p>Hola,<br>Tu perfil ha sido actualizado correctamente.</p>`
+    };
 
-      await sgMail.send(msg);
-      let content = fs.readFileSync(seedPath, 'utf8');
-      let startUser = content.indexOf(`correo: '${correo}'`);
-      if (startUser === -1) return;
-      let blockEnd = content.indexOf('}', startUser) + 1;
-      let block = content.slice(startUser, blockEnd);
+    await sgMail.send(msg);
+    let content = fs.readFileSync(seedPath, 'utf8');
+    let startUser = content.indexOf(`correo: '${correo}'`);
+    if (startUser === -1) return;
+    let blockEnd = content.indexOf('}', startUser) + 1;
+    let block = content.slice(startUser, blockEnd);
 
-      function esc(val) { return String(val).replace(/'/g, "\\'"); }
-      function replaceField(blockStr, field, value) {
-        const re = new RegExp(`(${field}:\\s*)['\"\`].*?['\"\`]`);
-        return blockStr.replace(re, `$1'${esc(value)}'`);
-      }
+    function esc(val) { return String(val).replace(/'/g, "\\'"); }
+    function replaceField(blockStr, field, value) {
+      const re = new RegExp(`(${field}:\\s*)['\"\`].*?['\"\`]`);
+      return blockStr.replace(re, `$1'${esc(value)}'`);
+    }
 
-      if (updates.nombre) block = replaceField(block, 'nombre', updates.nombre);
-      if (updates.apellido) block = replaceField(block, 'apellido', updates.apellido);
-      if (updates.telefono) block = replaceField(block, 'telefono', updates.telefono);
-      if (updates.correo) block = replaceField(block, 'correo', updates.correo.toLowerCase());
+    if (updates.nombre) block = replaceField(block, 'nombre', updates.nombre);
+    if (updates.apellido) block = replaceField(block, 'apellido', updates.apellido);
+    if (updates.telefono) block = replaceField(block, 'telefono', updates.telefono);
+    if (updates.correo) block = replaceField(block, 'correo', updates.correo.toLowerCase());
 
-      content = content.slice(0, startUser) + block + content.slice(blockEnd);
-      fs.writeFileSync(seedPath, content, 'utf8');
-    } catch (_) {}
+    content = content.slice(0, startUser) + block + content.slice(blockEnd);
+    fs.writeFileSync(seedPath, content, 'utf8');
+  } catch (_) { }
 }
 
 router.post('/Registrar', validateRegister, async (req, res) => {
@@ -465,7 +465,7 @@ router.post('/RecuperarContrasena', [
     user.tokenRecuperacionExpira = resetTokenExpiry;
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/recuperarcontrasena?ref=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/reestablecer-contrasena?ref=${resetToken}`;
 
     const msg = {
       to: user.correo,
