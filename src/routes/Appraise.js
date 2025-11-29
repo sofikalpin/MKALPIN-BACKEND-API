@@ -70,16 +70,34 @@ const sendTasacionNotification = async (tasacion, payload, files = []) => {
 
     // SendGrid attachments (base64)
     if (files && files.length > 0) {
+      const axios = require('axios');
       msg.attachments = await Promise.all(files.map(async (file) => {
-        const fs = require('fs').promises;
-        const fileData = await fs.readFile(file.path);
-        return {
-          content: fileData.toString('base64'),
-          filename: file.originalname,
-          type: file.mimetype,
-          disposition: 'attachment',
-        };
+        try {
+          let fileData;
+          // Check if file.path is a URL (Cloudinary) or a local path
+          if (file.path && file.path.startsWith('http')) {
+            // Download from Cloudinary URL
+            const response = await axios.get(file.path, { responseType: 'arraybuffer' });
+            fileData = Buffer.from(response.data);
+          } else {
+            // Read from local file system
+            const fs = require('fs').promises;
+            fileData = await fs.readFile(file.path);
+          }
+
+          return {
+            content: fileData.toString('base64'),
+            filename: file.originalname,
+            type: file.mimetype,
+            disposition: 'attachment',
+          };
+        } catch (fileError) {
+          console.error(`Error procesando archivo ${file.originalname}:`, fileError);
+          return null;
+        }
       }));
+      // Filter out any null attachments from errors
+      msg.attachments = msg.attachments.filter(att => att !== null);
     }
 
     await sgMail.send(msg);

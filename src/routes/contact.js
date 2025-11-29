@@ -407,7 +407,7 @@ router.post('/AlquilerTemporal', [
     `;
 
     const msg = {
-      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+      to: process.env.TASACION_EMAIL_TO || 'mkalpinni@gmail.com',
       from: process.env.EMAIL_FROM || process.env.SENDGRID_SENDER || 'noreply@mkalpin.com',
       subject: `Consulta de alquiler temporal de ${contactData.nombre || 'Cliente'}`,
       html: detallesHtml,
