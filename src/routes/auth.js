@@ -465,7 +465,7 @@ router.post('/RecuperarContrasena', [
     user.tokenRecuperacionExpira = resetTokenExpiry;
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reestablecer-contrasena?ref=${resetToken}`;
+    const resetUrl = `https://mkalpin-frontend-web.onrender.com/reestablecer-contrasena?ref=${resetToken}`;
 
     const msg = {
       to: user.correo,
